@@ -1,0 +1,53 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+  
+  "Description" : "(0002) - This template creates the YayNay DB backend.",
+
+  "Parameters": {
+    "NetworkStackName": {
+      "Description": "Name of an active CloudFormation stack that contains the networking resources, such as the subnet and security group, that will be used in this stack.",
+      "Type": "String",
+      "MinLength" : 1,
+      "MaxLength" : 255,
+      "AllowedPattern" : "^[a-zA-Z][-a-zA-Z0-9]*$",
+      "Default" : "JerryDEMOVPC"
+    },
+        "DBPrivateIP": {
+        "Description": "Fixed private IP for the NAT server",
+        "Type": "String",
+        "Default": "192.168.3.231"
+        }
+  },
+  "Mappings" : {
+    "AWSRegionArch2AMI" : {
+      "us-east-1"        : {"PV64" : "ami-8ff710e2", "HVM64" : "ami-f5f41398", "HVMG2" : "ami-4afd1d27"},
+      "us-east-2"        : {"PV64" : "ami-eff1028f", "HVM64" : "ami-a4290dc1", "HVMG2" : "ami-ee897b8e"}
+    }
+  },
+
+  "Resources" : {
+    "DBServerInstance": {  
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "InstanceType"   : "t2.micro",
+        "ImageId": { "Fn::FindInMap": [ "AWSRegionArch2AMI", { "Ref": "AWS::Region" } , "HVM64" ] },
+        "Tags": [ {"Key": "Name", "Value": "DB"} ],   
+        "NetworkInterfaces" : [{
+          "GroupSet"                 : [{ "Fn::ImportValue" :  {"Fn::Sub": "${NetworkStackName}-SecurityGroupID" } }],
+          "AssociatePublicIpAddress" : "false",
+          "PrivateIpAddress"        : {"Ref": "DBPrivateIP"},
+          "DeviceIndex"              : "0",
+          "DeleteOnTermination"      : "true",       
+          "SubnetId"                 : { "Fn::ImportValue" : {"Fn::Sub": "${NetworkStackName}-SubnetID" } }
+        }],
+      }
+    }
+  },
+
+  "Outputs" : {
+    "URL" : {
+      "Description" : "URL of the sample website",
+      "Value" :  { "Fn::Join" : [ "", [ "http://", { "Fn::GetAtt" : [ "DBServerInstance", "PublicDnsName" ]}]]}
+    }
+  }
+}

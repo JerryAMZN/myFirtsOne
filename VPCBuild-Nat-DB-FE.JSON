@@ -1,0 +1,554 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "(0001) - This template creates a VPC infrastructure VPC, 2 Public Subnets, 2 Private Subnets and a NAT instance.",
+    "Parameters": {
+        "NATInstanceType": {
+            "Description": "Amazon EC2 instance type for the NAT Instances",
+            "Type": "String",
+            "Default": "t2.medium",
+            "AllowedValues": [
+                "t2.medium",
+                "m3.large",
+                "m3.xlarge",
+                "m3.2xlarge"
+            ]
+        },
+       "DomainDNSName"    : {
+            "Description" : "Fully qualified domain name (FQDN) of the forest root domain e.g. DomainName.local",
+            "Type"        : "String",
+            "Default"     : "CFBDemo.com",
+            "MinLength"   : "3",
+            "MaxLength"   : "25",
+            "AllowedPattern" : "[a-zA-Z0-9]+\\..+"
+        },
+        "DomainNetBIOSName" : {
+            "Description" : "NetBIOS name of the domain (upto 15 characters) for users of earlier versions of Windows e.g. DomainName",
+            "Type"        : "String",
+            "Default"     : "CFNDemo",
+            "MinLength"   : "1",
+            "MaxLength"   : "15",
+            "AllowedPattern" : "[a-zA-Z0-9]+"
+        },
+        "Priv2SubCIDR": {
+            "Description": "Private subnet 2 CIDR Block",
+            "Type": "String",
+            "Default": "192.168.4.0/24",
+            "AllowedPattern": "[a-zA-Z0-9]+\\..+"
+        },
+        "Priv1SubCIDR": {
+            "Description": "Private subnet 1 CIDR Block",
+            "Type": "String",
+            "Default": "192.168.3.0/24",
+            "AllowedPattern": "[a-zA-Z0-9]+\\..+"
+        },
+        "PubSub1CIDR": {
+            "Description": "Public subnet 1 CIDR Block",
+            "Type": "String",
+            "Default": "192.168.1.0/24",
+            "AllowedPattern": "[a-zA-Z0-9]+\\..+"
+        },
+        "PubSub2CIDR": {
+            "Description": "Public subnet 2 CIDR Block",
+            "Type": "String",
+            "Default": "192.168.2.0/24",
+            "AllowedPattern": "[a-zA-Z0-9]+\\..+"
+        },
+        "VPCCIDR": {
+            "Description": "CIDR Block for the CFN Demo-VPC",
+            "Type": "String",
+            "Default": "192.168.0.0/16",
+            "AllowedPattern": "[a-zA-Z0-9]+\\..+"
+        },
+        "NATPrivateIP": {
+            "Description": "Fixed private IP for the NAT server",
+            "Type": "String",
+            "Default": "192.168.1.10"
+        }
+    },
+    "Mappings": {
+        "AWSInstanceType2Arch": {
+            "t2.medium": {
+                "Arch": "64"
+            }
+        },
+        "AWSRegionArchNatAMI": {
+            "us-east-1": {
+                "64": "ami-184dc970"
+            },
+            "us-east-2":{
+                "64": "ami-36c29853"
+            }
+        }
+    },
+    "Resources": {
+        "DhcpOptions": {
+            "Type": "AWS::EC2::DHCPOptions",
+            "Properties": {
+                "DomainName": {
+                    "Ref": "DomainDNSName"
+                },
+                "DomainNameServers": [
+                    "AmazonProvidedDNS"
+                ]
+            }
+        },
+        "VPC": {
+            "Type": "AWS::EC2::VPC",
+            "Properties": {
+                "CidrBlock": {
+                    "Ref": "VPCCIDR"
+                },
+                "Tags": [
+                    {
+                        "Key": "Application",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "Public"
+                    },
+                    {
+                        "Key": "Name",
+                        "Value": "CFN Demo VPC"
+                    }
+                ]
+            }
+        },
+        "VPCDHCPOptionsAssociation": {
+            "Type": "AWS::EC2::VPCDHCPOptionsAssociation",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "DhcpOptionsId": {
+                    "Ref": "DhcpOptions"
+                }
+            }
+        },
+        "Priv1Sub": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "CidrBlock": {
+                    "Ref": "Priv1SubCIDR"
+                },
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        0,
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Application",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "Public"
+                    },
+                    {
+                        "Key": "Role",
+                        "Value": "CFN Demo Private Subnet 1"
+                    },
+                    {
+                        "Key": "Name",
+                        "Value": "CFN Demo Private Subnet 1"
+                    }
+                ]
+            }
+        },
+        "Priv2Sub": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "CidrBlock": {
+                    "Ref": "Priv2SubCIDR"
+                },
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        1,
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Application",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "Public"
+                    },
+                    {
+                        "Key": "Role",
+                        "Value": "CFN Demo Private Subnet 2"
+                    },
+                    {
+                        "Key": "Name",
+                        "Value": "CFN Demo Private Subnet 2"
+                    }
+                ]
+            }
+        },
+        "PubSub1": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "CidrBlock": {
+                    "Ref": "PubSub1CIDR"
+                },
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        0,
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Application",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "Public"
+                    },
+                    {
+                        "Key": "Role",
+                        "Value": "CFN Demo Public Subnet 1"
+                    },
+                    {
+                        "Key": "Name",
+                        "Value": "CFN Demo Public Subnet 1"
+                    }
+                ]
+            }
+        },
+        "PubSub2": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "CidrBlock": {
+                    "Ref": "PubSub2CIDR"
+                },
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        1,
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Application",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "Public"
+                    },
+                    {
+                        "Key": "Role",
+                        "Value": "CFN Demo Public Subnet 2"
+                    },
+                    {
+                        "Key": "Name",
+                        "Value": "CFN Demo Public Subnet 2"
+                    }
+                ]
+            }
+        },
+        "InternetGateway": {
+            "Type": "AWS::EC2::InternetGateway",
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "Application",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "Public"
+                    }
+                ]
+            }
+        },
+        "AttachGateway": {
+            "Type": "AWS::EC2::VPCGatewayAttachment",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "InternetGatewayId": {
+                    "Ref": "InternetGateway"
+                }
+            }
+        },
+        "PublicRouteTable": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "Tags": [
+                    {
+                        "Key": "Application",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "CFN Demo-Pub-RT"
+                    },
+                    {
+                        "Key": "Name",
+                        "Value": "CFN DEMO-Pub-RT"
+                    }
+                ]
+            }
+        },
+        "PublicRoute": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "PublicRouteTable"
+                },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "GatewayId": {
+                    "Ref": "InternetGateway"
+                }
+            }
+        },
+        "SubPubCIDRRouteTableAssociation1": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "PubSub1"
+                },
+                "RouteTableId": {
+                    "Ref": "PublicRouteTable"
+                }
+            }
+        },
+        "SubPubCIDRRouteTableAssociation2": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "PubSub2"
+                },
+                "RouteTableId": {
+                    "Ref": "PublicRouteTable"
+                }
+            }
+        },
+        "PrivateRouteTable": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "Tags": [
+                    {
+                        "Key": "Application",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "CFN Demo-Priv-RT"
+                    },
+                    {
+                        "Key": "Name",
+                        "Value": "CFN Demo-Priv-RT"
+                    }
+                ]
+            }
+        },
+        "PrivateRoute": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "PrivateRouteTable"
+                },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "InstanceId": {
+                    "Ref": "NAT"
+                }
+            }
+        },
+        "SubPrivCIDRRouteTableAssociation1": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "Priv1Sub"
+                },
+                "RouteTableId": {
+                    "Ref": "PrivateRouteTable"
+                }
+            }
+        },
+		"SubPrivCIDRRouteTableAssociation2": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "Priv2Sub"
+                },
+                "RouteTableId": {
+                    "Ref": "PrivateRouteTable"
+                }
+            }
+        },
+        "NAT": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "ImageId": {
+                    "Fn::FindInMap": [
+                        "AWSRegionArchNatAMI",
+                        {
+                            "Ref": "AWS::Region"
+                        },
+                        {
+                            "Fn::FindInMap": [
+                                "AWSInstanceType2Arch",
+                                {
+                                    "Ref": "NATInstanceType"
+                                },
+                                "Arch"
+                            ]
+                        }
+                    ]
+                },
+                "InstanceType": {
+                    "Ref": "NATInstanceType"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "NAT"
+                    }
+                ],
+                "NetworkInterfaces": [
+                    {
+                        "GroupSet": [
+                            {
+                                "Ref": "NATSG"
+                            }
+                        ],
+                        "AssociatePublicIpAddress": "true",
+                        "DeviceIndex": "0",
+                        "DeleteOnTermination": "true",
+                        "SubnetId": {
+                            "Ref": "PubSub1"
+                        },
+                        "PrivateIpAddress": {
+                            "Ref": "NATPrivateIP"
+                        }
+                    }
+                ],
+                "SourceDestCheck": "false"
+            }
+        },
+        "NATSG": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Enables SSH access to NAT and all traffic from VPC level",
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "22",
+                        "ToPort": "22",
+                        "CidrIp": "0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol": "-1",
+                        "CidrIp": {
+                            "Ref": "VPCCIDR"
+                        }
+                    }
+                ],
+                "SecurityGroupEgress": [
+                    {
+                        "IpProtocol": "-1",
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ]
+            }
+        }
+    },
+    "Outputs": {
+        "VPC": {
+            "Value": {
+                "Ref": "VPC"
+            },
+            "Description": "VPC ID"
+        },
+        "StackName": {
+            "Value": {
+                "Ref": "AWS::StackName"
+            },
+            "Description": "StackName"
+        },
+        "VPCCIDR": {
+            "Value": {
+                "Ref": "VPCCIDR"
+            },
+            "Description": "VPC CIDR"
+        },
+        "PubSub1CIDR": {
+            "Value": {
+                "Ref": "PubSub1CIDR"
+            },
+            "Description": "Public Subnet 1"
+        },
+        "PubSub2CIDR": {
+            "Value": {
+                "Ref": "PubSub2CIDR"
+            },
+            "Description": "Public Subnet 2"
+        },
+        "Priv1SubCIDR": {
+            "Value": {
+                "Ref": "Priv1SubCIDR"
+            },
+            "Description": "Private Subnet 1"
+        },
+        "Priv2SubCIDR": {
+            "Value": {
+                "Ref": "Priv2SubCIDR"
+            },
+            "Description": "Private Subnet 2"
+        }
+    }
+}
